@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Batch-wise Student Attendance</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #ccc;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    .add-student {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+
+    .add-student input,
+    .add-student select {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .add-student button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .add-student button:hover {
+      background-color: #218838;
+    }
+
+    h2 {
+      margin-top: 30px;
+      color: #007bff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      text-align: center;
+      border: 1px solid #ccc;
+    }
+
+    th {
+      background-color: #007bff;
+      color: white;
+    }
+
+    .timestamp {
+      font-size: 0.9em;
+      color: #555;
+    }
+
+    .download-btn,
+    .reset-btn {
+      padding: 10px 20px;
+      font-size: 14px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px 5px 20px 0;
+    }
+
+    .download-btn:hover {
+      background-color: #0056b3;
+    }
+
+    .reset-btn {
+      background-color: #dc3545;
+    }
+
+    .reset-btn:hover {
+      background-color: #a71d2a;
+    }
+
+    .batch-section {
+      margin-bottom: 50px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Student Attendance by Batch</h1>
+
+    <div class="add-student">
+      <input type="text" id="newStudent" placeholder="Enter student name">
+      <select id="batchSelect">
+        <option value="">Select Batch</option>
+        <option value="Morning">Morning</option>
+        <option value="Afternoon">Afternoon</option>
+        <option value="Evening">Evening</option>
+      </select>
+      <select id="courseSelect">
+        <option value="">Select Course</option>
+        <option value="HTML">HTML</option>
+        <option value="CSS">CSS</option>
+        <option value="JavaScript">JavaScript</option>
+        <option value="PHP">PHP</option>
+        <option value="Python">Python</option>
+        <option value="SQL">SQL</option>
+        <option value="Java">Java</option>
+        <option value="R">R</option>
+      </select>
+      <button onclick="addStudent()">Add Student</button>
+    </div>
+
+    <div id="batchTables"></div>
+  </div>
+
+  <script>
+    let students = JSON.parse(localStorage.getItem("students") || "[]");
+    let attendanceData = JSON.parse(localStorage.getItem("attendanceData") || "{}");
+
+    function saveStudents() {
+      localStorage.setItem("students", JSON.stringify(students));
+    }
+
+    function saveAttendanceData() {
+      localStorage.setItem("attendanceData", JSON.stringify(attendanceData));
+    }
+
+    function addStudent() {
+      const nameInput = document.getElementById("newStudent");
+      const batchSelect = document.getElementById("batchSelect");
+      const courseSelect = document.getElementById("courseSelect");
+
+      const name = nameInput.value.trim();
+      const batch = batchSelect.value;
+      const course = courseSelect.value;
+
+      if (!name || !batch || !course) {
+        alert("Please enter student name, select batch, and select course.");
+        return;
+      }
+
+      const duplicate = students.find(s => s.name.toLowerCase() === name.toLowerCase() && s.batch === batch && s.course === course);
+      if (duplicate) {
+        alert("This student already exists in the selected batch and course.");
+        return;
+      }
+
+      students.push({ name, batch, course });
+      saveStudents();
+
+      nameInput.value = "";
+      batchSelect.value = "";
+      courseSelect.value = "";
+
+      renderTables();
+    }
+
+    function renderTables() {
+      const batches = ["Morning", "Afternoon", "Evening"];
+      const container = document.getElementById("batchTables");
+      container.innerHTML = "";
+
+      batches.forEach(batch => {
+        const batchStudents = students.filter(s => s.batch === batch);
+        if (batchStudents.length === 0) return;
+
+        const section = document.createElement("div");
+        section.className = "batch-section";
+
+        section.innerHTML = `
+          <h2>
+            ${batch} Batch
+            <div>
+              <button class="reset-btn" onclick="resetBatchAttendance('${batch}')">Reset Attendance</button>
+              <button class="download-btn" onclick="downloadBatch('${batch}')">Download ${batch} Batch Attendance</button>
+            </div>
+          </h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Student Name</th>
+                <th>Course</th>
+                <th>Present</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${batchStudents.map(s => {
+                const key = `${batch}|${s.name}`;
+                const savedStatus = attendanceData[key]?.status || "Absent";
+                const savedTimestamp = attendanceData[key]?.timestamp || "--:--";
+                const checked = savedStatus === "Present" ? "checked" : "";
+                return `
+                  <tr>
+                    <td>${s.name}</td>
+                    <td>${s.course}</td>
+                    <td>
+                      <input type="checkbox" id="status-${batch}-${escapeId(s.name)}" ${checked} onchange="updateCheckbox('${batch}', '${escapeQuotes(s.name)}')" />
+                    </td>
+                    <td class="timestamp" id="timestamp-${batch}-${escapeId(s.name)}">${savedTimestamp}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+
+        container.appendChild(section);
+      });
+    }
+
+    function escapeId(name) {
+      return name.replace(/[^a-zA-Z0-9_-]/g, "_");
+    }
+
+    function escapeQuotes(str) {
+      return str.replace(/'/g, "\\'");
+    }
+
+    function updateCheckbox(batch, studentName) {
+      const checkbox = document.getElementById(`status-${batch}-${escapeId(studentName)}`);
+      const isChecked = checkbox.checked;
+      const key = `${batch}|${studentName}`;
+
+      if (!isChecked) {
+        document.getElementById(`timestamp-${batch}-${escapeId(studentName)}`).textContent = "--:--";
+        attendanceData[key] = { status: "Absent", timestamp: "--:--" };
+        saveAttendanceData();
+        return;
+      }
+
+      const now = new Date();
+      const formatted = now.toLocaleString();
+
+      document.getElementById(`timestamp-${batch}-${escapeId(studentName)}`).textContent = formatted;
+      attendanceData[key] = { status: "Present", timestamp: formatted };
+      saveAttendanceData();
+    }
+
+    function resetBatchAttendance(batch) {
+      if (!confirm(`Are you sure you want to reset attendance for ${batch} batch?`)) return;
+
+      students.filter(s => s.batch === batch).forEach(s => {
+        const key = `${batch}|${s.name}`;
+        if (attendanceData[key]) delete attendanceData[key];
+      });
+
+      saveAttendanceData();
+      renderTables();
+    }
+
+    function downloadBatch(batch) {
+      const batchStudents = students.filter(s => s.batch === batch);
+      if (batchStudents.length === 0) return;
+
+      let tableHTML = `<table border="1"><tr><th>Student Name</th><th>Course</th><th>Status</th><th>Timestamp</th></tr>`;
+
+      batchStudents.forEach(s => {
+        const key = `${batch}|${s.name}`;
+        const status = attendanceData[key]?.status || "Absent";
+        const timestamp = attendanceData[key]?.timestamp || "--:--";
+
+        tableHTML += `<tr><td>${s.name}</td><td>${s.course}</td><td>${status}</td><td>${timestamp}</td></tr>`;
+      });
+
+      tableHTML += `</table>`;
+
+      const blob = new Blob(["\ufeff" + tableHTML], { type: "application/vnd.ms-excel" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+
+      const now = new Date();
+      const timestamp = now.getFullYear().toString() +
+                        String(now.getMonth() + 1).padStart(2, '0') +
+                        String(now.getDate()).padStart(2, '0') + "_" +
+                        String(now.getHours()).padStart(2, '0') +
+                        String(now.getMinutes()).padStart(2, '0') +
+                        String(now.getSeconds()).padStart(2, '0');
+
+      link.download = `${batch}_Batch_Attendance_${timestamp}.xls`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    renderTables();
+  </script>
+</body>
+</html>
